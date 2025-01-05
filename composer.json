@@ -8,7 +8,7 @@
       "AstraTech\\DataForge\\": "src/"
     },
     "files": [
-        "src/Helper.php"
+      "src/Helper.php"
     ]
   },
   "authors": [
@@ -19,13 +19,29 @@
   ],
   "require": {
     "php": "^8.0",
-    "laravel/framework": "^8.0|^9.0"
+    "laravel/framework": "^8.0|^9.0|^10.0"
   },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/Astra-Techno/DataForge.git"
+    }
+  ],
   "extra": {
     "laravel": {
       "providers": [
         "AstraTech\\DataForge\\DataForgeServiceProvider"
-      ]
+      ],
+      "aliases": {
+        "DataForge": "AstraTech\\DataForge\\Base\\DataForge"
+      }
     }
-  }
+  },
+  "scripts": {
+    "post-autoload-dump": [
+      "@php artisan vendor:publish --provider=\"AstraTech\\DataForge\\DataForgeServiceProvider\" --force"
+    ]
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
 }
