@@ -24,7 +24,7 @@
   "repositories": [
     {
       "type": "vcs",
-      "url": "https://github.com/Astra-Techno/DataForge.git"
+      "url": "https://github.com/Astra-Techno/DataForge"
     }
   ],
   "extra": {
@@ -42,6 +42,6 @@
       "@php artisan vendor:publish --provider=\"AstraTech\\DataForge\\DataForgeServiceProvider\" --force"
     ]
   },
-  "minimum-stability": "stable",
+  "minimum-stability": "dev",
   "prefer-stable": true
 }
