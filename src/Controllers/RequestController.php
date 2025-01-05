@@ -1,5 +1,5 @@
 <?php
-namespace MJTech\DataForge\Http\Controllers;
+namespace AstraTech\DataForge\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
