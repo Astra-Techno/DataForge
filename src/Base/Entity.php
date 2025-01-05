@@ -14,7 +14,7 @@ abstract class Entity extends ClassObject
 
     final function getClassName()
     {
-        return str_replace('App\Library\\', '', get_class($this));
+        return str_replace('App\DataForge\\', '', get_class($this));
     }
 
     // Magic method to get dynamic properties
@@ -62,8 +62,8 @@ abstract class Entity extends ClassObject
 	function _getPropertyMethods()
 	{
 		$methods1 = get_class_methods($this);
-		$methods2 = \Factory()->classMethods('App\Library\Base\ClassObject');
-		$methods3 = \Factory()->classMethods('App\Library\Base\Entity');
+		$methods2 = DataForge::classMethods('AstraTech\DataForge\Base\ClassObject');
+		$methods3 = DataForge::classMethods('AstraTech\DataForge\Base\Entity');
 
 		$methods1 = array_diff($methods1, $methods2);
 		$methods1 = array_diff($methods1, $methods3);
@@ -99,18 +99,18 @@ abstract class Entity extends ClassObject
  		if ($attrbs == 'all')
  			$attrbs = $this->_getPropertyMethods();
  		else if (!is_array($attrbs))
- 			$attrbs = \Factory()->split($attrbs);
+ 			$attrbs = DataForge::split($attrbs);
 
         foreach ($attrbs as $attrb)
         {
 			$tmp = $this->$attrb;
-            if (is_object($tmp) && strpos(get_class($tmp), 'App\Library\Entity\\') !== false)
+            if (is_object($tmp) && strpos(get_class($tmp), 'App\DataForge\Entity\\') !== false)
                 $tmp = $tmp->toArray();
             else if (is_array($tmp) && !empty($tmp[0]))
             {
             	$sub = [];
 				foreach ($tmp as $key => $val) {
-					if (is_object($val) && strpos(get_class($val), 'App\Library\Entity\\') !== false)
+					if (is_object($val) && strpos(get_class($val), 'App\DataForge\Entity\\') !== false)
 					    $val = $val->toArray();
 
 					$sub[$key] = $val;
@@ -136,7 +136,7 @@ abstract class Entity extends ClassObject
                 $attribs .= ','.$groups[$group];
         }
 
-        $attribs = \Factory()->split($attribs);
+        $attribs = DataForge::split($attribs);
 		return $this->toArray($attribs, $withBase);
  	}
 }

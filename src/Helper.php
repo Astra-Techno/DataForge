@@ -1,11 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\DB;
-use App\Library\Base\Sql;
-use App\Library\Base\Task;
-use App\Library\Base\Query;
-use App\Library\Base\Schema;
-use App\Library\Base\Factory;
+use AstraTech\DataForge\Base\Sql;
+use AstraTech\DataForge\Base\Task;
+use AstraTech\DataForge\Base\Query;
 
 if  (!function_exists('Sql')) {
     /**
@@ -61,10 +59,10 @@ if  (!function_exists('Task')) {
 if  (!function_exists('Factory')) {
     function Factory()
     {
-        static $factory = null;
+        /*static $factory = null;
         if (!$factory)
             $factory = new Factory();
-        return $factory;
+        return $factory;*/
     }
 }
 
@@ -94,23 +92,6 @@ if  (!function_exists('dbQuote')) {
     function dbQuote($str)
     {
         return DB::connection()->getPdo()->quote($str);
-    }
-}
-
-if  (!function_exists('User')) {
-	/**
-	 * User function returns logged user object.
-	 *
-	 * @return object Returns logged user entity.
-	 */
-    function User()
-    {
-    	static $_user = null;
-    	if ($_user)
-    		return $_user;
-
-		$_user = Factory()->getUser();
-        return $_user;
     }
 }
 

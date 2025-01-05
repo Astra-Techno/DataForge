@@ -2,8 +2,16 @@
 
 namespace AstraTech\DataForge;
 
-use Illuminate\Support\Facades\AliasLoader;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Support\Facades\File;
+
+use AstraTech\DataForge\Handlers\ErrorHandler;
+use AstraTech\DataForge\Base\DataForge;
+use AstraTech\DataForge\Base\Sql;
+use AstraTech\DataForge\Base\Entity;
+use AstraTech\DataForge\Base\Task;
 
 class DataForgeServiceProvider extends ServiceProvider
 {
@@ -19,16 +27,31 @@ class DataForgeServiceProvider extends ServiceProvider
     public function boot()
     {
         // Load the package routes from the 'routes/api.php' file
-        $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
+        $this->loadRoutesFrom(__DIR__ . '/routes/api.php');
         
         $this->publishes([
             __DIR__ . '/../routes/' => base_path('routes/dataforge'),
         ], 'routes');
+
+        // Alias the DataForge class
+        class_alias(DataForge::class, 'DataForge');
+
+        // Alias the Sql class
+        class_alias(Sql::class, 'DataForge\Sql');
+
+        // Alias the Sql class
+        class_alias(Entity::class, 'DataForge\Entity');
+
+        // Alias the Sql class
+        class_alias(Task::class, 'DataForge\Task');
         
         // Example: You can add publishing of config files if necessary
         // $this->publishes([
         //     __DIR__ . '/../config/dataforge.php' => config_path('dataforge.php'),
         // ], 'config');
+
+        // Replace Laravel's default exception handler with the custom handler
+        $this->app->singleton(ExceptionHandler::class, ErrorHandler::class);
         
         // Ensure the app/DataForge directory exists
         $this->createDataForgeDirectory();
@@ -51,7 +74,7 @@ class DataForgeServiceProvider extends ServiceProvider
         // });
         
         // Bind the DataForge class to the container
-        AliasLoader::getInstance()->alias('DataForge', \AstraTech\DataForge\Base\DataForge::class);
+        App::getInstance()->alias('DataForge', \AstraTech\DataForge\Base\DataForge::class);
     }
 
     /**

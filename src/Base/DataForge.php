@@ -10,13 +10,13 @@ use Illuminate\Support\Arr;
 
 class DataForge extends ClassStatic
 {
-    public function findClass($prefix, $name, $delimitter = ':', $skipError = false)
+    public static function findClass($prefix, $name, $delimitter = ':', $skipError = false)
     {
         if (empty($name))
             self::raiseError("Empty value passed to load class!");
 
 
-        @list($name, $classMethod) = $this->split($name, $delimitter);
+        @list($name, $classMethod) = self::split($name, $delimitter);
         $className = $prefix ? $prefix.'\\'.$name : $name;
 
         if (!class_exists($className)) {
@@ -40,7 +40,7 @@ class DataForge extends ClassStatic
      * @param  string  $delimitter
      * @return array
      */
-    public function split($name, $delimitter = ',', $noDuplicates = true)
+    public static function split($name, $delimitter = ',', $noDuplicates = true)
     {
         $delimitter = empty($delimitter) ? ':' : $delimitter;
         $split = explode($delimitter, $name);
@@ -57,7 +57,7 @@ class DataForge extends ClassStatic
      * @param  string  $var
      * @return boolean
      */
-    function is_int($var)
+    static function is_int($var)
     {
         return preg_match('/^\d+(,\d+)*$/', trim(str_replace(' ', '', $var)));
     }
@@ -65,7 +65,7 @@ class DataForge extends ClassStatic
     /**
      * @ignore
      */
-    function getRequestField($field)
+    static function getRequestField($field)
     {
         $allowed_fields = ['sort_by', 'sort_order', 'select_type'];
         if (strpos($field, 'filter_') === 0 || strpos($field, 'filter.') === 0)
@@ -76,7 +76,7 @@ class DataForge extends ClassStatic
         return '';
     }
 
-    function replaceConstant($str, $input, &$failed = [], $isSql = false)
+    static function replaceConstant($str, $input, &$failed = [], $isSql = false)
     {
         preg_match_all('/{(.*?)}/', $str, $matches);
 
@@ -133,7 +133,7 @@ class DataForge extends ClassStatic
         return [$class, $result];
     }*/
 
-	function parseMethodName($name, $type = 'get')
+	static function parseMethodName($name, $type = 'get')
 	{
 		if (!$type)
 			return false;
@@ -152,16 +152,16 @@ class DataForge extends ClassStatic
 	}
 
     // Define a method that will be called when a non-existing method is invoked
-    public function __call($name, $arguments)
+    public static function __callStatic($name, $arguments)
     {
-    	$methods = $this->parseMethodName($name, 'get');
+    	$methods = self::parseMethodName($name, 'get');
     	if (!$methods)
-    		return $this->raiseError("Entity not found - '$name' with inputs: " . implode(', ', $arguments));
+    		return self::raiseError("Entity not found - '$name' with inputs: " . implode(', ', $arguments));
 
 		$className = '';
  		foreach ($methods as $method) {
  			$method = is_array($method) ? implode("\\", $method) : $method;
- 			$classMethod = $this->findClass('App\Library\Entity', $method, ':', true);
+ 			$classMethod = self::findClass('App\DataForge\Entity', $method, ':', true);
 			if ($classMethod) {
 				$className = $classMethod[0];
 				break;
@@ -199,7 +199,7 @@ class DataForge extends ClassStatic
 		return $input;
 	}
 
-    public function classMethods($name)
+    public static function classMethods($name)
     {
     	static $_methods = [];
     	if (isset($_methods[$name]))

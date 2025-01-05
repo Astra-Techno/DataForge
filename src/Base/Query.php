@@ -166,7 +166,7 @@ class Query extends ClassObject
         // Build the SQL query string.
         $query = ["SELECT"];
         $query[] = "\t".$this->getSelect();
-        $query[] = $this->from;
+        $query[] = "FROM ".$this->from;
 
         foreach ($this->join as $join)
             $query[] = $join;
@@ -199,7 +199,7 @@ class Query extends ClassObject
     {
 		$failed = [];
 		if ($this->query) {
-			$this->query = \Factory()->replaceConstant($this->query, $data, $failed, false);
+			$this->query = DataForge::replaceConstant($this->query, $data, $failed, false);
 			if (!$this->query && $failed)
 				$this->raiseError($this->_name.' - required inputs ('.implode(", ", $failed).') missing!');
 			return;
@@ -208,7 +208,7 @@ class Query extends ClassObject
         foreach ($this->where AS $key => $where)
         {
             $failed = [];
-            $str = \Factory()->replaceConstant($where['condition'], $data, $failed, true);
+            $str = DataForge::replaceConstant($where['condition'], $data, $failed, true);
             if ($str && !$failed) {
                 $this->where[$key]['condition'] = $str;
                 continue;
@@ -226,7 +226,7 @@ class Query extends ClassObject
             foreach  ($conditions as $i => $condition)
             {
                 $failed = [];
-                $str = \Factory()->replaceConstant($condition, $data, $failed, true);
+                $str = DataForge::replaceConstant($condition, $data, $failed, true);
                 if (!$str || $failed)
                     continue;
 
@@ -239,7 +239,7 @@ class Query extends ClassObject
         }
 
         $failed = [];
-        $this->orderBy = \Factory()->replaceConstant($this->orderBy.' '.$this->order, $data, $failed, false);
+        $this->orderBy = DataForge::replaceConstant($this->orderBy.' '.$this->order, $data, $failed, false);
         if ($failed)
             $this->orderBy = '';
     }

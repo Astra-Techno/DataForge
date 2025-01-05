@@ -28,7 +28,7 @@ class Sql extends ClassObject
         if (empty($name))
             return $this;
 
-        @list($className, $method) = Factory()->findClass('App\Library\Sqls', $name);
+        @list($className, $method) = DataForge::findClass('App\DataForge\Sql', $name);
 
         $classMethod = $method ?? 'default';
         $classMethod = trim($classMethod);
@@ -36,7 +36,7 @@ class Sql extends ClassObject
         $class = new $className();
 
         if (!method_exists($class, $classMethod)) {
-        	$className = ltrim($className, 'App\Library\\');
+        	$className = ltrim($className, 'App\DataForge\\');
             $this->raiseError("$className:$classMethod - method not found!");
         }
 
@@ -49,7 +49,7 @@ class Sql extends ClassObject
             $query->assignKeys($input);
             $query->bind($input);
         } else
-            Factory()->replaceConstant($query, $input);
+            DataForge::replaceConstant($query, $input);
 
 		$class->setQuery($query);
 
@@ -75,6 +75,15 @@ class Sql extends ClassObject
 		return current($row);
     }
 
+    final function fetchColumn($column = '')
+    {
+		$row = $this->assoc();
+		if (!$row || count($row) == 0 || ($column && !isset($row[$column])))
+			return '';
+
+		return current($row);
+    }
+
     final function resultList($column = '')
     {
 		$rows = $this->objectList();
@@ -90,7 +99,17 @@ class Sql extends ClassObject
 		return json_decode(json_encode($this->object()), true);
     }
 
+    final function fetchRow()
+    {
+		return json_decode(json_encode($this->object()), true);
+    }
+
     final function assocList()
+    {
+		return json_decode(json_encode($this->objectList()), true);
+    }
+
+    final function fetchRowList()
     {
 		return json_decode(json_encode($this->objectList()), true);
     }
