@@ -68,8 +68,8 @@ class DataForge extends ClassStatic
     static function getRequestField($field)
     {
         $allowed_fields = ['sort_by', 'sort_order', 'select_type'];
-        if (strpos($field, 'filter_') === 0 || strpos($field, 'filter.') === 0)
-           return $field; //str_replace('filter_', 'filter.', $field);
+        if (strpos($field, 'request.') === 0 || strpos($field, 'filter.') === 0) 
+           return str_replace('request.', '', $field);
         else if (in_array($field, $allowed_fields))
             return $field;
 

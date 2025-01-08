@@ -16,9 +16,9 @@ class EntityController extends Controller
 			], 403);
         }
 
-        $base = (int) request('base', 1);
+        $base = (int) request('baseAttrib', 1);
         $attribGroup = request('group');
-        $attribs = request('attribs');
+        $attribs = request('attrib');
 
         if ($attribGroup)
             return response($entity->toGroupArray($attribGroup, $attribs, $base));

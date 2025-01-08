@@ -60,7 +60,13 @@ class SqlController extends Controller
     {
         $classMethod = $this->getSqlName($path);
         $select = request('select', 'list');
-        $obj = \Sql($classMethod, ['select_type' => $select]);
+	$limit = (int) request('limit');
+	
+	$args = ['select_type' => $select];
+	if ($limit > 0)
+		$args['limit'] = $limit;
+		
+        $obj = \Sql($classMethod, $args);
 
         if (debugMode())
             $out = (string) $obj;

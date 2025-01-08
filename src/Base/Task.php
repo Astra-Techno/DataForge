@@ -9,7 +9,7 @@ class Task extends ClassObject
 		if (empty($name))
 			return $this;
 
-		@list($className, $method) = Factory()->findClass('App\Library\Tasks', $name);
+		@list($className, $method) = DataForge::findClass('App\DataForge\Task', $name);
 
 		$classMethod = $method ?? 'default';
 		$classMethod = trim($classMethod);
@@ -17,10 +17,10 @@ class Task extends ClassObject
 		$class = new $className();
 
 		if (!method_exists($class, $classMethod)) {
-			$className = ltrim($className, 'App\Library\\');
+			$className = ltrim($className, 'App\DataForge\\');
             $classMethod = ltrim($classMethod, 'Guest');
 
-			$msg = ltrim($className, '\Tasks').'/'.$classMethod;
+			$msg = ltrim($className, '\Task').'/'.$classMethod;
             if (config('app.debug'))
             	$msg = $className.':'.$classMethod;
 
