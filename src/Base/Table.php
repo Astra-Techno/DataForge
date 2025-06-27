@@ -1,14 +1,30 @@
 <?php
-
 namespace AstraTech\DataForge\Base;
 
+use Exception;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
-use App\Models\BaseModel;
+use Illuminate\Support\Facades\Auth;
 
 class Table extends ClassStatic
 {
+	private static function validate(array $input, string $tableName)
+	{
+		if (!$input) {
+            self::setError('Empty input to save table - '.$tableName);
+            return false;
+        }
+
+        $tableName = trim(preg_replace('/^jos_/', '', $tableName));
+        if(!$tableName) {
+            self::setError('Empty tableName to save!');
+            return false;
+        }
+
+		return $tableName;
+	}
+
     public static function update(array $input, string $tableName, $filterKeys = null, array $appendFields = [])
     {
         // Reuse the process logic for updating
@@ -17,22 +33,28 @@ class Table extends ClassStatic
 
     public static function save(array $input, string $tableName, $filterKeys = null, array $appendFields = [], $updateOnly = false)
     {
-        if (!$input) {
-            self::setError('Empty input to save table - '.$tableName);
+        //Log::info('Inputs'.print_r($input, true));
+    	$tableName = self::validate($input, $tableName);
+        if (!$tableName)
             return false;
-        }
 
-        $tableName = trim(ltrim(trim($tableName),"jos_"));
-        if(!$tableName) {
-            self::setError('Empty tableName to save!');
+        // Get schema info.
+        if (!$schemaInfo = self::getSchemaInfo($tableName))
             return false;
-        }
 
-        // Clean input fields.
-        $columns    = Schema::getColumnListing($tableName);
-        $input      = array_intersect_key($input, array_flip($columns));
+        //Log::info($tableName.':'.print_r($schemaInfo, true));
 
+        // Set filterKeys as the primary key from schemaInfo if not already provided
+        if (!empty($filterKeys) && empty($schemaInfo->primary_key))
+            $schemaInfo->primary_key = $filterKeys;
+
+		// Clean input fields.
+        $input = array_intersect_key($input, array_flip($schemaInfo->columns));
+
+		// Fetch matching record.
         $record = self::fetchExistingRecord($tableName, $filterKeys, $input);
+
+        //Log::info($tableName.'record:'.print_r($record, true));
         if (!$record && $updateOnly) {
             self::setError('Record not found!');
             return false;
@@ -41,18 +63,24 @@ class Table extends ClassStatic
         // Handle field append logic (merge fields)
         if ($record) {
             foreach ($appendFields as $appendField) {
-                if (isset($input[$appendField]) && in_array($appendField, $columns)) {
+                if (isset($input[$appendField]) && in_array($appendField, $schemaInfo->columns)) {
                     $input[$appendField] = $record->$appendField . ' ' . $input[$appendField];
                 }
             }
+
+            if (in_array('modified_by', $schemaInfo->columns))
+                $input['modified_by'] = Auth::id();
+        } else if (in_array('created_by', $schemaInfo->columns) && empty($input['created_by']) && !$record) {
+            // Handle created by.
+            $input['created_by'] = Auth::id();
         }
 
         // Handle auto timestamps
-        if (in_array('created', $columns) && empty($input['created']) && !$record)
-            $input['created'] = \Factory()->Date();
+        if (in_array('created', $schemaInfo->columns) && empty($input['created']) && !$record)
+            $input['created'] = DataForge::Date();
 
-        if (in_array('updated', $columns))
-            $input['updated'] = \Factory()->Date();
+        if (in_array('modified', $schemaInfo->columns))
+            $input['modified'] = DataForge::Date();
 
         // Perform update or insert
         $dataBeforeSave = [];
@@ -65,15 +93,55 @@ class Table extends ClassStatic
         foreach ($input as $key => $value)
             $record->{$key} = $value;
 
-        $record->setPrimaryKey(self::getPrimaryKey($tableName));
-        if (!$record->save())
+        // Set primaryKeyInfo on Base model.
+        if ($schemaInfo->primary_key) {
+        	$filterKeys = $schemaInfo->keys;
+            $record->setPrimaryKey($schemaInfo->primary_key);
+            if (!$schemaInfo->auto_increment)
+                $record->incrementing = false;
+        } else
+        	$record->incrementing = false;
+
+        if (!self::saveRecord($record))
             return false;
 
         $dataAfterSave = $record->toArray();
+
         self::logAudit($tableName, $dataBeforeSave, $dataAfterSave);
 
         return $dataAfterSave;
     }
+
+	public static function delete($input, $tableName, $filterKeys)
+	{
+		$tableName = self::validate($input, $tableName);
+        if (!$tableName)
+            return false;
+
+		// Get schema info.
+        if (!$schemaInfo = self::getSchemaInfo($tableName))
+            return false;
+
+		// Clean input fiel ds.
+        $input = array_intersect_key($input, array_flip($schemaInfo->columns));
+
+		// Fetch matching record.
+        $record = self::fetchExistingRecord($tableName, $filterKeys, $input);
+        if (!$record) {
+            self::setError('Record not found!');
+            return false;
+        }
+
+		if ($schemaInfo->primary_key) {
+		 	$input[$schemaInfo->primary_key] = $record->{$schemaInfo->primary_key};
+		 	$filterKeys = $schemaInfo->primary_key;
+		}
+
+		if (!$record->delete())
+			return false;
+
+        return true;
+	}
 
     // Fetch existing record based on filter keys
     private static function fetchExistingRecord($tableName, $filterKeys, $input)
@@ -86,7 +154,7 @@ class Table extends ClassStatic
         foreach ($filterConditions as $condition)
         {
             $baseModel = new BaseModel($tableName);
-            if ($record = $baseModel->Where($condition)->first()) {}
+            if ($record = $baseModel->Where($condition)->first())
                 return $record;
         }
 
@@ -94,7 +162,7 @@ class Table extends ClassStatic
     }
 
     // Helper function to parse filter keys (like id|email&name)
-    private static function parseFilterKeys($filterKeys, $input)
+    public static function parseFilterKeys($filterKeys, $input)
     {
         $conditions = [];
         if (!$filterKeys)
@@ -121,14 +189,76 @@ class Table extends ClassStatic
         return $conditions;
     }
 
-    private static function getPrimaryKey($tableName)
-    {
-        $primaryKey = DB::select("SHOW INDEX FROM `jos_".$tableName."` WHERE Key_name = 'PRIMARY'");
-        if (!$primaryKey)
-            return '';
+	private static function getSchemaInfo($table)
+	{
+		$tableName = $table;
 
-        return $primaryKey[0]->Column_name;
-    }
+		// Unique cache key for primary key info
+		$cacheKey = 'table_pk_info_1' . $tableName;
+		$schemaTimestampKey = 'schema_last_updated_' . $tableName;
+
+		// Fetch the last schema update time
+		$result = DB::select("
+		        SELECT
+		            UPDATE_TIME
+		        FROM information_schema.tables AS T
+		        WHERE T.table_schema = ?
+		            AND T.table_name = ?
+		    ", [DB::getDatabaseName(), $tableName]);
+
+		if (!$result) {
+            self::setError('Table ('.$tableName.') - not found!');
+			return false;
+        }
+
+		$schemaUpdateTime = $result[0]->UPDATE_TIME;
+
+		// Get the last stored schema update time from cache
+		$lastCachedUpdateTime = Cache::get($schemaTimestampKey);
+
+		// If schema was updated, clear cache
+		if ($schemaUpdateTime && $schemaUpdateTime !== $lastCachedUpdateTime) {
+		    Cache::forget($cacheKey);
+		    Cache::put($schemaTimestampKey, $schemaUpdateTime, 86400); // Store schema update time for 1 day
+		}
+
+		$schemaInfo = (object) Cache::remember($cacheKey, 86400, function () use ($tableName, $table) {
+		    // Fetch primary key and auto_increment info
+		    $result = DB::select("
+		        SELECT
+		            GROUP_CONCAT(C.column_name) AS primary_key,
+		            GROUP_CONCAT(DISTINCT C.extra) AS extra_info
+		        FROM information_schema.columns AS C
+		        JOIN information_schema.tables AS T
+		            ON C.table_schema = T.table_schema
+		            AND C.table_name = T.table_name
+		        WHERE C.table_schema = DATABASE()
+		        AND C.table_name = ?
+		        AND C.column_key = 'PRI'
+		    ", [$tableName]);
+
+		    $out = ['primary_key' => '', 'keys' => '', 'auto_increment' => 0, 'columns' => []];
+
+		    if ($result) {
+		        $keys = explode(',', $result[0]->primary_key);
+		        $out = [
+		            'primary_key' => $keys[0],
+		            'keys' => implode('&', $keys),
+		            'auto_increment' => strpos($result[0]->extra_info, 'auto_increment') !== false ? 1 : 0,
+		            'columns'	=> Schema::getColumnListing($table)
+		        ];
+		    }
+
+		    return $out;
+		});
+
+        if (empty($schemaInfo->columns)) {
+        	self::setError('Invalid table to save!');
+            return false;
+        }
+
+		return $schemaInfo;
+	}
 
     // Batch save method to handle multiple records
     public static function saveBatch(array $inputs, string $tableName, $filterKeys = null, array $appendFields = [])
@@ -188,34 +318,49 @@ class Table extends ClassStatic
         $historyRecord = new BaseModel('history_log');
         $historyRecord->table_id = $historyTable->id;
 		$historyRecord->record_id = $dataAfterSave[$historyTable->primary_key];
-		$historyRecord->changed_by = user()->id;
-        $historyRecord->changed = \Factory()->Date();
+		$historyRecord->changed_by = Auth::id();
+        $historyRecord->changed = DataForge::Date();
 		$historyRecord->is_first = empty($dataBeforeSave) ? 1 : 0;
 
         if ($historyTable->new_table == 1) {
             $historyChangesRecord = new BaseModel('history_log_changes');
             $historyChangesRecord->changes = $changes;
-            $historyChangesRecord->save();
+            self::saveRecord($historyChangesRecord);
 
             $historyRecord->changes_id = $historyChangesRecord->id;
         } else
     		$historyRecord->changes = $changes;
 
-        return $historyRecord->save();
+        return self::saveRecord($historyRecord);
     }
 
     private static function getHistoryTable($tableName)
 	{
         $historyTable = new BaseModel('history_log_tables');
-        if ($record = $historyTable->Where('name', 'jos_'.$tableName)->first())
+        if ($record = $historyTable->Where('name', $tableName)->first())
             return $record;
 
-        $historyTable->name = 'jos_'.$tableName;
+        $primaryKeyInfo = self::getSchemaInfo($tableName);
+        if ($primaryKeyInfo)
+            $historyTable->primary_key = $primaryKeyInfo->primary_key;
+
+        $historyTable->name = $tableName;
         $historyTable->enabled = 1;
-        $historyTable->primary_key = self::getPrimaryKey($tableName);
-        $historyTable->save();
 
-		return $historyTable;
+		return self::saveRecord($historyTable);
 	}
-}
 
+    private static function saveRecord(&$record)
+    {
+        try {
+            $record->save();
+
+            $record = $record->fresh();
+        } catch(Exception $e) {
+            self::setError($e->getMessage());
+            return false;
+        }
+
+        return $record;
+    }
+}

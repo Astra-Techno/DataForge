@@ -1,6 +1,7 @@
 <?php
-
 namespace AstraTech\DataForge\Base;
+
+use Illuminate\Support\Facades\Validator;
 
 abstract class Entity extends ClassObject
 {
@@ -20,27 +21,108 @@ abstract class Entity extends ClassObject
     // Magic method to get dynamic properties
     public function __get($name)
     {
-        if (isset($this->_data[$name]))
+        return $this->get($name, true) ?? null;
+    }
+
+    public function __isset($name)
+	{
+		return !empty($this->get($name, false));
+	}
+
+	final function get($name, $raiseError = false)
+	{
+		if (property_exists((object)$this->_data, $name))
             return $this->_data[$name];
         else if (isset($this->_data['_method'][$name]))
             return $this->_data['_method'][$name];
 
         $method = 'get'.$name;
-        if (!method_exists($this, $method))
-            $this->raiseError($name." - property not found in class ".$this->className);
+		if (!method_exists($this, $method)) {
+			if ($raiseError)
+	            $this->raiseError($name." - property not found in class ".$this->className);
+	        return null;
+        }
 
         $this->_data['_method'][$name] = $this->$method();
+
         return $this->_data['_method'][$name];
     }
 
     abstract function init($args);
 
-	final function bind($array)
+	final function bindInitProperties($array)
 	{
 		// Assigning dynamic properties to the object
 		foreach ($array as $key => $value) {
 			$this->$key = $value;
 		}
+	}
+
+	function bind($array)
+	{
+		$this->bindInitProperties($array);
+	}
+
+	final function validate($rules, $data = [])
+	{
+		if (!$rules) {
+			$this->setError('Validate rules empty!');
+			return false;
+		}
+
+		$data = empty($data) ? $this->_data : $data;
+		if (!$data) {
+			$this->setError('Empty data to validate!');
+			return false;
+		}
+
+		// Validate the data
+		$validator = Validator::make($data, $rules);
+		if ($validator->fails()) {
+            $this->setError(implode("\n", $validator->errors()->all()));
+			return false;
+		}
+
+		return true;
+	}
+
+	final function MediaSave($record_id)
+	{
+		// Verify media section defined in entity.
+		if (!method_exists($this, 'getMediaSection')) {
+			$this->setError('Media section not defined in '.$this->className);
+			return false;
+		}
+
+		// Verify media types defined in entity.
+		if (!method_exists($this, 'getMediaTypes')) {
+			$this->setError('Media types not defined in '.$this->className);
+			return false;
+		}
+
+		$types = [];
+		foreach ($this->MediaTypes as $type) 
+		{
+			if (empty($this->_data[$type]))
+				continue;
+
+			// Load media type.
+			$mediaType = DataForge::getSystemMediaType(['section' => $this->MediaSection, 'name' => $type]);
+			if (!$mediaType) {
+				$this->setError('Media section ('.$this->MediaSection.') & type ('.$type.') not configured in system!');
+				return false;
+			}
+
+			// Copy media record from temp table.
+			if (!$mediaType->copyMedia($this->_data[$type], $record_id)) {
+				$this->setError($mediaType->getError());
+				return false;
+			}
+
+			$types[] = $type;
+		}
+
+		return array_unique($types);
 	}
 
     final function unset($args)
@@ -139,4 +221,26 @@ abstract class Entity extends ClassObject
         $attribs = DataForge::split($attribs);
 		return $this->toArray($attribs, $withBase);
  	}
+
+    final function TableSave($array, $table, $keys = 'id')
+    {
+        $array = Table::save($array, $table, $keys);
+        if (!$array) {
+            $this->setError(Table::getError());
+			return false;
+        }
+
+        return $array;
+    }
+
+    final function TableDelete($array, $table, $keys = 'id')
+    {
+        $out = \Table::delete($array, $table, $keys);
+        if (!$out) {
+            $this->setError(\Table::getError());
+			return false;
+        }
+
+        return $out;
+    }
 }

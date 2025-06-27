@@ -34,16 +34,20 @@ class DataForgeServiceProvider extends ServiceProvider
         ], 'routes');
 
         // Alias the DataForge class
-        class_alias(DataForge::class, 'DataForge');
+        if (!class_exists('DataForge'))
+            class_alias(DataForge::class, 'DataForge');
 
         // Alias the Sql class
+        if (!class_exists('DataForge\Sql'))
         class_alias(Sql::class, 'DataForge\Sql');
 
         // Alias the Sql class
-        class_alias(Entity::class, 'DataForge\Entity');
+        if (!class_exists('DataForge\Entity'))
+            class_alias(Entity::class, 'DataForge\Entity');
 
         // Alias the Sql class
-        class_alias(Task::class, 'DataForge\Task');
+        if (!class_exists('DataForge\Task'))
+            class_alias(Task::class, 'DataForge\Task');
         
         // Example: You can add publishing of config files if necessary
         // $this->publishes([

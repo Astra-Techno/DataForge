@@ -8,7 +8,7 @@ use AstraTech\DataForge\Controllers\GuestTaskController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->group(function () {
-	Route::middleware(['auth'])->group(function () {
+	Route::middleware(['auth:sanctum'])->group(function () {
 		$urlMatch = '[a-zA-Z0-9]+(/[a-zA-Z0-9]+)?(:[a-zA-Z0-9]+)?';
 		Route::get('list/{path}', [SqlController::class, 'list'])->where('path', $urlMatch);        // http://localhost:8000/api/list/Users/all
 		Route::get('group-list/{path}', [SqlController::class, 'groupedList'])->where('path', $urlMatch);        // http://localhost:8000/api/group-list/Users/all

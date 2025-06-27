@@ -154,9 +154,15 @@ class DataForge extends ClassStatic
     // Define a method that will be called when a non-existing method is invoked
     public static function __callStatic($name, $arguments)
     {
+        $isNew = false;
     	$methods = self::parseMethodName($name, 'get');
-    	if (!$methods)
-    		return self::raiseError("Entity not found - '$name' with inputs: " . implode(', ', $arguments));
+    	if (!$methods) {
+            $isNew = true;
+            $methods = self::parseMethodName($name, 'new');
+        }
+
+        if (!$methods)
+    	    return self::raiseError("Entity not found - '$name' with inputs: " . implode(', ', $arguments));
 
 		$className = '';
  		foreach ($methods as $method) {
@@ -172,15 +178,27 @@ class DataForge extends ClassStatic
             self::raiseError(self::getError());
 
         $class = new $className();
-        if ($item = call_user_func_array([$class, 'init'], $arguments))
-            $class->bind($item);
-        else {
-			self::setError($method. " entity data not loaded! - for inputs: " . implode(', ', self::convertArgs($arguments)));
-			return false;
+        if ($isNew) {
+            if (!method_exists($class, 'bind')) {
+                self::setError("Couldn't create (".$method.") entity, bind method not found!");
+                return false;
+            }
+
+            call_user_func_array([$class, 'bind'], $arguments);
+
+            if (method_exists($class, 'create')) {
+                call_user_func([$class, 'create']);
+            }
+
+        } else if ($item = call_user_func_array([$class, 'init'], $arguments)) {
+            $class->bindInitProperties($item);
+        } else {
+            self::setError($method. " entity data not loaded! - for inputs: " . implode(', ', self::convertArgs($arguments)));
+            return false;
         }
 
         // Check entity access.
-        if (method_exists($class, 'access') && !$class->access()) {
+        if (!$isNew && method_exists($class, 'access') && !$class->access()) {
             self::setError("Access invalid for (".$method. ") entity! - for inputs: " . implode(', ', self::convertArgs($arguments)));
 			return false;
         }
@@ -188,7 +206,7 @@ class DataForge extends ClassStatic
         return $class;
     }
 
-	public function convertArgs($input)
+	public static function convertArgs($input)
 	{
 		foreach ($input as $key => $val) {
 			if (is_array($val))
@@ -244,11 +262,6 @@ class DataForge extends ClassStatic
 		curl_setopt($curl_session, CURLOPT_SSL_VERIFYHOST, 0);
 		curl_setopt($curl_session, CURLOPT_SSL_VERIFYPEER, 0);
 
-		// curl_setopt($curl_session, CURLOPT_PROXYPORT, '3128');
-		// curl_setopt($curl_session, CURLOPT_PROXYTYPE, 'HTTPS');
-		// curl_setopt($curl_session, CURLOPT_PROXY, '192.168.3.1');
-		// curl_setopt($curl_session, CURLOPT_PROXYUSERPWD, ':');
-
 		$data = trim(curl_exec($curl_session));
 		$error = trim(curl_error($curl_session));
 		$http_code = curl_getinfo($curl_session, CURLINFO_HTTP_CODE);
@@ -295,22 +308,8 @@ class DataForge extends ClassStatic
         return self::getCURLResponse($client_url, $params, $client_header);
     }
 
-	public function Date($format = 'Y-m-d H:i:s', $tz = 'UTC')
+	public static function Date($format = 'Y-m-d H:i:s', $tz = 'UTC')
 	{
 		return now()->setTimezone($tz)->format($format);
 	}
-
-    public function siteAccess($group)
-    {
-        $allowedGroups = [];
-        $allowedGroups['propertymanager'] = [8, 25, 28, 26, 37, 39, 40];
-        $allowedGroups['landlord'] = [31];
-        $allowedGroups['tenant'] = [19];
-        $allowedGroups['tradie'] = [21,22,23,29,30,35];
-
-        if (empty($allowedGroups[$group]))
-            return [];
-
-        return $allowedGroups[$group];
-    }
 }
